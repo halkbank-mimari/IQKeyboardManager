@@ -267,7 +267,7 @@
     //  Creating a toolBar for phoneNumber keyboard
     IQToolbar *toolbar = self.keyboardToolbar;
   
-    //SERCAN ASD
+    //SERCAN
     toolbar.tintColor = self.tintColor;
     
     NSMutableArray<UIBarButtonItem*> *items = [[NSMutableArray alloc] init];

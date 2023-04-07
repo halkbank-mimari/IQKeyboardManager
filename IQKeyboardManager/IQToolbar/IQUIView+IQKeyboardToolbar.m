@@ -268,7 +268,6 @@
     IQToolbar *toolbar = self.keyboardToolbar;
   
     //SERCAN
-    //TEST
     toolbar.tintColor = self.tintColor;
     
     NSMutableArray<UIBarButtonItem*> *items = [[NSMutableArray alloc] init];

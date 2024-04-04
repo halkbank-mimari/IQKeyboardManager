@@ -1510,12 +1510,7 @@ typedef void (^SizeBlock)(CGSize size);
                         [self showLog:[NSString stringWithFormat:@"Restoring contentOffset to : %@",NSStringFromCGPoint(newContentOffset)]];
 
                         BOOL animatedContentOffset = ([strongSelf.textFieldView superviewOfClassType:[UIStackView class] belowView:superscrollView] != nil);   //  (Bug ID: #1365, #1508, #1541)
-
-                        if (animatedContentOffset) {
-                            [superscrollView setContentOffset:newContentOffset animated:UIView.areAnimationsEnabled];
-                        } else {
-                            superscrollView.contentOffset = newContentOffset;
-                        }
+                        strongLastScrollView.contentOffset = strongSelf.startingContentOffset;
                     }
                 }
             } while ((superscrollView = (UIScrollView*)[superscrollView superviewOfClassType:[UIScrollView class]]));

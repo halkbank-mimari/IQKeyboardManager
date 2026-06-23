@@ -87,11 +87,7 @@ internal struct IQScrollViewConfiguration {
             scrollView is UICollectionView ||
             scrollView is UITableView
 
-            if animatedContentOffset {
-                scrollView.setContentOffset(startingContentOffset, animated: UIView.areAnimationsEnabled)
-            } else {
-                scrollView.contentOffset = startingContentOffset
-            }
+            scrollView.contentOffset = startingContentOffset;
             success = true
         }
 

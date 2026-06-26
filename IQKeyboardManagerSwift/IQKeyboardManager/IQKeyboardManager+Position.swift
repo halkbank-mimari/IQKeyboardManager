@@ -752,47 +752,49 @@ private extension IQKeyboardManager {
         }
     }
 
-    func restoreScrollViewContentOffset(superScrollView: UIScrollView, textInputView: (some IQTextInputView)?) {
-        var superScrollView: UIScrollView? = superScrollView
-        while let scrollView: UIScrollView = superScrollView {
+  func restoreScrollViewContentOffset(
+      superScrollView: UIScrollView,
+      textInputView: (some IQTextInputView)?
+  ) {
+      var superScrollView: UIScrollView? = superScrollView
 
-            let width: CGFloat = CGFloat.maximum(scrollView.contentSize.width, scrollView.frame.width)
-            let height: CGFloat = CGFloat.maximum(scrollView.contentSize.height, scrollView.frame.height)
-            let contentSize: CGSize = CGSize(width: width, height: height)
+      while let scrollView: UIScrollView = superScrollView {
+          scrollView.layoutIfNeeded()
 
-            let minimumY: CGFloat = contentSize.height - scrollView.frame.height
+          let adjustedInset = scrollView.adjustedContentInset
 
-            if minimumY < scrollView.contentOffset.y {
+          let minOffsetY = -adjustedInset.top
 
-                let newContentOffset: CGPoint = CGPoint(x: scrollView.contentOffset.x, y: minimumY)
-                if !scrollView.contentOffset.equalTo(newContentOffset) {
+          let maxOffsetY = max(
+              minOffsetY,
+              scrollView.contentSize.height
+                  - scrollView.bounds.height
+                  + adjustedInset.bottom
+          )
 
-                    //  (Bug ID: #1365, #1508, #1541)
-                    let stackView: UIStackView?
-                    if let textInputView: UIView = textInputView {
-                        stackView = textInputView.iq.superviewOf(type: UIStackView.self,
-                                                                 belowView: scrollView)
-                    } else {
-                        stackView = nil
-                    }
+          let currentOffset = scrollView.contentOffset
 
-                    // (Bug ID: #1901, #1996)
-                    let animatedContentOffset: Bool = stackView != nil ||
-                    scrollView is UICollectionView ||
-                    scrollView is UITableView
+          let fixedOffsetY = min(
+              max(currentOffset.y, minOffsetY),
+              maxOffsetY
+          )
 
-                    if animatedContentOffset {
-                        scrollView.setContentOffset(newContentOffset, animated: UIView.areAnimationsEnabled)
-                    } else {
-                        scrollView.contentOffset = newContentOffset
-                    }
+          let fixedOffset = CGPoint(
+              x: currentOffset.x,
+              y: fixedOffsetY
+          )
 
-                    showLog("Restoring contentOffset to: \(newContentOffset)")
-                }
-            }
+          if currentOffset != fixedOffset {
+              UIView.performWithoutAnimation {
+                  scrollView.setContentOffset(fixedOffset, animated: false)
+                  scrollView.layoutIfNeeded()
+              }
 
-            superScrollView = scrollView.iq.superviewOf(type: UIScrollView.self)
-        }
-    }
+              showLog("Fixed excessive scroll restore. contentOffset: \(fixedOffset)")
+          }
+
+          superScrollView = scrollView.iq.superviewOf(type: UIScrollView.self)
+      }
+  }
 }
 // swiftlint:enable function_parameter_count

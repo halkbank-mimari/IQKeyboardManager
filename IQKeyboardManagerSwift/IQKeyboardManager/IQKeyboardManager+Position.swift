@@ -597,7 +597,10 @@ private extension IQKeyboardManager {
                 // Skip reloading input views during interactive navigation gesture to prevent toolbar flash (Issue #2102)
                 if self.activeConfiguration.rootConfiguration?.isInteractiveGestureActive == false {
                     // This will update the next/previous states
-                    textInputView.reloadInputViews()
+                    if #unavailable(iOS 27.0),
+                        self.activeConfiguration.rootConfiguration?.isInteractiveGestureActive == false {
+                        textInputView.reloadInputViews()
+                    }
                 }
             }
         })

@@ -586,7 +586,17 @@ private extension IQKeyboardManager {
             scrollView is UICollectionView ||
             scrollView is UITableView
 
-            if animatedContentOffset {
+            // iOS 27: nested setContentOffset(animated:) inside the keyboard animator
+            // desynchronizes UITableView/UICollectionView. Carbon lists then jump when
+            // Done dismisses, and at the bottom inset the dismiss is cancelled so the
+            // toolbar Done button appears dead. Assigning contentOffset rides the
+            // keyboard animation. reloadInputViews() is skipped on iOS 27 because it
+            // re-enters keyboard layout and freezes previous/next.
+            if #available(iOS 27.0, *),
+               scrollView is UITableView || scrollView is UICollectionView {
+                scrollView.contentOffset = newContentOffset
+                scrollView.layoutIfNeeded()
+            } else if animatedContentOffset {
                 scrollView.setContentOffset(newContentOffset, animated: UIView.areAnimationsEnabled)
             } else {
                 scrollView.contentOffset = newContentOffset
@@ -757,43 +767,72 @@ private extension IQKeyboardManager {
         var superScrollView: UIScrollView? = superScrollView
         while let scrollView: UIScrollView = superScrollView {
 
-            let width: CGFloat = CGFloat.maximum(scrollView.contentSize.width, scrollView.frame.width)
-            let height: CGFloat = CGFloat.maximum(scrollView.contentSize.height, scrollView.frame.height)
-            let contentSize: CGSize = CGSize(width: width, height: height)
+            if #available(iOS 27.0, *),
+               scrollView is UITableView || scrollView is UICollectionView {
+                if let fixedOffset = contentOffsetClampedToRestoredInset(scrollView) {
+                    scrollView.contentOffset = fixedOffset
+                    scrollView.layoutIfNeeded()
+                    showLog("Restoring contentOffset to: \(fixedOffset)")
+                }
+            } else {
+                let width: CGFloat = CGFloat.maximum(scrollView.contentSize.width, scrollView.frame.width)
+                let height: CGFloat = CGFloat.maximum(scrollView.contentSize.height, scrollView.frame.height)
+                let contentSize: CGSize = CGSize(width: width, height: height)
 
-            let minimumY: CGFloat = contentSize.height - scrollView.frame.height
+                let minimumY: CGFloat = contentSize.height - scrollView.frame.height
 
-            if minimumY < scrollView.contentOffset.y {
+                if minimumY < scrollView.contentOffset.y {
 
-                let newContentOffset: CGPoint = CGPoint(x: scrollView.contentOffset.x, y: minimumY)
-                if !scrollView.contentOffset.equalTo(newContentOffset) {
+                    let newContentOffset: CGPoint = CGPoint(x: scrollView.contentOffset.x, y: minimumY)
+                    if !scrollView.contentOffset.equalTo(newContentOffset) {
 
-                    //  (Bug ID: #1365, #1508, #1541)
-                    let stackView: UIStackView?
-                    if let textInputView: UIView = textInputView {
-                        stackView = textInputView.iq.superviewOf(type: UIStackView.self,
-                                                                 belowView: scrollView)
-                    } else {
-                        stackView = nil
+                        //  (Bug ID: #1365, #1508, #1541)
+                        let stackView: UIStackView?
+                        if let textInputView: UIView = textInputView {
+                            stackView = textInputView.iq.superviewOf(type: UIStackView.self,
+                                                                     belowView: scrollView)
+                        } else {
+                            stackView = nil
+                        }
+
+                        // (Bug ID: #1901, #1996)
+                        let animatedContentOffset: Bool = stackView != nil ||
+                        scrollView is UICollectionView ||
+                        scrollView is UITableView
+
+                        if animatedContentOffset {
+                            scrollView.setContentOffset(newContentOffset, animated: UIView.areAnimationsEnabled)
+                        } else {
+                            scrollView.contentOffset = newContentOffset
+                        }
+
+                        showLog("Restoring contentOffset to: \(newContentOffset)")
                     }
-
-                    // (Bug ID: #1901, #1996)
-                    let animatedContentOffset: Bool = stackView != nil ||
-                    scrollView is UICollectionView ||
-                    scrollView is UITableView
-
-                    if animatedContentOffset {
-                        scrollView.setContentOffset(newContentOffset, animated: UIView.areAnimationsEnabled)
-                    } else {
-                        scrollView.contentOffset = newContentOffset
-                    }
-
-                    showLog("Restoring contentOffset to: \(newContentOffset)")
                 }
             }
 
             superScrollView = scrollView.iq.superviewOf(type: UIScrollView.self)
         }
+    }
+
+    /// Bottom inset after the keyboard inset has been removed, without the transient
+    /// keyboard component UIKit keeps in `adjustedContentInset` while dismiss is in flight.
+    func contentOffsetClampedToRestoredInset(_ scrollView: UIScrollView) -> CGPoint? {
+        scrollView.layoutIfNeeded()
+
+        let bottomInset = min(
+            scrollView.adjustedContentInset.bottom,
+            scrollView.contentInset.bottom + scrollView.safeAreaInsets.bottom
+        )
+        let minOffsetY = -scrollView.adjustedContentInset.top
+        let maxOffsetY = max(
+            minOffsetY,
+            scrollView.contentSize.height - scrollView.bounds.height + bottomInset
+        )
+        let offsetY = min(max(scrollView.contentOffset.y, minOffsetY), maxOffsetY)
+        let fixedOffset = CGPoint(x: scrollView.contentOffset.x, y: offsetY)
+        guard !scrollView.contentOffset.equalTo(fixedOffset) else { return nil }
+        return fixedOffset
     }
 }
 // swiftlint:enable function_parameter_count
